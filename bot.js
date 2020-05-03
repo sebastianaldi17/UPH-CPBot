@@ -6,7 +6,9 @@ const client = new Discord.Client()
 const api_cooldown = 5000
 const prefix = "--"
 const help = `Here are all the available commands:
--- cf: Shows upcoming Codeforces contests`
+-- cf: Shows upcoming Codeforces contests
+-- help: displays all available commands
+-- user: displays the user's information in Codeforces`
 
 let cooling = false
 
@@ -25,18 +27,38 @@ function secondsToDHMS(seconds) {
     return dDisplay + hDisplay + mDisplay + sDisplay
 }
 
+function checkContests() {
+    let broadcast_channel = client.channels.cache.get(process.env.CHANNEL_ID)
+    request('https://codeforces.com/api/contest.list', { json: true }, (err, res, body) => {
+        if (err) { return console.log(err) }
+        if (body.status != 'OK') {
+            console.log("API Error (Codeforces side, may be down)")
+        } else {
+            body.result.filter(item => item.phase === 'BEFORE').sort((a, b) => a.startTimeSeconds - b.startTimeSeconds).forEach(element => {
+                // Remind upcoming contests today
+                if (Math.abs(element.relativeTimeSeconds) <= 60 * 60 * 24) {
+                    let timer = Math.abs(element.relativeTimeSeconds) - 60 * 60
+                    let date = new Date(element.startTimeSeconds * 1000)
+                    if (timer < 0) {
+                        broadcast_channel.send(`Upcoming contest: ${element.name} on ${date.toLocaleString("en-US", { timeZone: "Asia/Jakarta" })}\n`)
+                    }
+                    else {
+                        console.log("Added timer for " + element.name)
+                        setTimeout(() => { broadcast_channel.send(`Upcoming contest: ${element.name} on ${date.toLocaleString("en-US", { timeZone: "Asia/Jakarta" })}\n`) }, timer * 1000)
+                    }
+                }
+            })
+        }
+    })
+}
+
 client.login(process.env.BOT_TOKEN)
 
 client.on('ready', () => {
     console.log("CP Bot is now online")
-})
-
-client.on("guildMemberAdd", (member) => {
-    member.guild.channels.find(c => c.name === "welcome").send(`Welcome, ${member.user.username}!`)
-})
-
-client.on("guildMemberRemove", (member) => {
-    member.guild.channels.find(c => c.name === "welcome").send(`We're sorry to see you leave, ${member.user.username}.`)
+    client.user.setActivity('your server. -- help for actions', { type: 'WATCHING' }).catch(console.error)
+    checkContests()
+    setInterval(checkContests, 1000 * 60 * 60 * 24)
 })
 
 client.on("message", (message) => {
@@ -66,6 +88,23 @@ client.on("message", (message) => {
                         setTimeout(() => { cooling = false }, api_cooldown)
                     }
                 })
+            } else if (content[1] === "user") {
+                if (content.length < 3) return message.reply("Not enough arguments. Syntax: -- user <nickname>")
+                else {
+                    request(`https://codeforces.com/api/user.info?handles=${content[2]}`, { json: true }, (err, res, body) => {
+                        if (err) { return console.log(err) }
+                        if (body.status != 'OK') {
+                            return message.reply(`An error has occured. Reason: ${body.comment}`)
+                        } else {
+                            if (body.result[0]) {
+                                let date = new Date(body.result[0].lastOnlineTimeSeconds * 1000)
+                                return message.reply(`User ${content[2]},\nRating: ${body.result[0].rating},\nLast online: ${date.toLocaleString("en-US", { timeZone: "Asia/Jakarta" })}`)
+                            }
+                        }
+                    })
+                }
+            } else if (content[1] === "help") {
+                return message.reply(help)
             }
         }
     }
