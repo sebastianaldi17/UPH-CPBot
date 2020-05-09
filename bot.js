@@ -28,6 +28,7 @@ function secondsToDHMS(seconds) {
 }
 
 function checkContests() {
+    console.log(`Performing contest checking at ${new Date(Date.now()).toLocaleString("en-US", { timeZone: "Asia/Jakarta" })}`)
     let broadcast_channel = client.channels.cache.get(process.env.CHANNEL_ID)
     request('https://codeforces.com/api/contest.list', { json: true }, (err, res, body) => {
         if (err) { return console.log(err) }
@@ -50,6 +51,7 @@ function checkContests() {
             })
         }
     })
+    setTimeout(checkContests, 1000 * 60 * 60 * 24)
 }
 
 client.login(process.env.BOT_TOKEN)
@@ -58,7 +60,6 @@ client.on('ready', () => {
     console.log("CP Bot is now online")
     client.user.setActivity('your server. -- help for actions', { type: 'WATCHING' }).catch(console.error)
     checkContests()
-    setInterval(checkContests, 1000 * 60 * 60 * 24)
 })
 
 client.on("message", (message) => {
